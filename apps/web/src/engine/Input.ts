@@ -6,7 +6,8 @@ const PREVENTED_KEYS = new Set([
 
 export class Input {
   private keys = new Set<string>();
-  private jumpQueued = false;
+  private jumpQueued   = false;
+  private attackQueued = false;
 
   attach() {
     window.addEventListener('keydown', this.onKeyDown);
@@ -44,10 +45,19 @@ export class Input {
     return true;
   }
 
+  consumeAttackPress(): boolean {
+    if (!this.attackQueued) return false;
+    this.attackQueued = false;
+    return true;
+  }
+
   private onKeyDown = (e: KeyboardEvent) => {
+    const tag = (document.activeElement as HTMLElement | null)?.tagName ?? '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     const isNew = !this.keys.has(e.code);
     this.keys.add(e.code);
-    if (e.code === 'Space' && isNew) this.jumpQueued = true;
+    if (e.code === 'Space' && isNew) this.jumpQueued   = true;
+    if (e.code === 'KeyE'  && isNew) this.attackQueued = true;
     if (PREVENTED_KEYS.has(e.code)) e.preventDefault();
   };
 

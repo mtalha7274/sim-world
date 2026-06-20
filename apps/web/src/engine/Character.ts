@@ -10,6 +10,8 @@ export class Character {
   private animations = new Map<AnimationState, SpriteAnimation>();
   private currentState: AnimationState = 'idle';
 
+  hasAnimations(): boolean { return this.animations.size > 0; }
+
   setAnimation(state: AnimationState, anim: SpriteAnimation) {
     this.animations.set(state, anim);
   }

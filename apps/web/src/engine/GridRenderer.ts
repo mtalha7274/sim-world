@@ -1,6 +1,6 @@
 import type { Camera } from './Camera';
 
-const CELL_SIZE   = 64; // world units per cell
+export const CELL_SIZE = 64; // world units per cell
 const MAJOR_EVERY = 8;  // one slightly darker line every N cells
 
 const COLOR_MINOR = '#eeeeee';
@@ -56,6 +56,6 @@ export class GridRenderer {
 
 // Align a CSS-pixel coordinate to the nearest device-pixel boundary,
 // preventing sub-pixel blurring on lines.
-function snapToDevicePixel(cssPx: number, dpr: number): number {
+export function snapToDevicePixel(cssPx: number, dpr: number): number {
   return Math.round(cssPx * dpr) / dpr;
 }

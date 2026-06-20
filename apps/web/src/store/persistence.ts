@@ -84,3 +84,63 @@ export function removeZone(state: AnimationState) {
 export function clearAll() {
   localStorage.removeItem(KEY);
 }
+
+// ── Tile map ─────────────────────────────────────────────────────────────────
+
+const TILE_KEY = 'sim-world-tiles-v1';
+
+export function saveTileMap(data: Record<string, number>) {
+  try {
+    localStorage.setItem(TILE_KEY, JSON.stringify(data));
+  } catch {
+    // localStorage full — silently skip
+  }
+}
+
+export function loadTileMap(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(TILE_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, number>) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function clearTileMap() {
+  localStorage.removeItem(TILE_KEY);
+}
+
+// ── Ground sheet ─────────────────────────────────────────────────────────────
+
+const GROUND_KEY = 'sim-world-ground-v1';
+
+export interface PersistedGround {
+  dataUrl: string;
+  columns?: number;
+  rows?: number;
+  marginX?: number;
+  marginY?: number;
+  spacingX?: number;
+  spacingY?: number;
+}
+
+export function saveGround(ground: PersistedGround) {
+  try {
+    localStorage.setItem(GROUND_KEY, JSON.stringify(ground));
+  } catch {
+    // localStorage full — silently skip
+  }
+}
+
+export function loadGround(): PersistedGround | null {
+  try {
+    const raw = localStorage.getItem(GROUND_KEY);
+    return raw ? (JSON.parse(raw) as PersistedGround) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearGround() {
+  localStorage.removeItem(GROUND_KEY);
+}
