@@ -16,8 +16,9 @@ export interface AgentRuntimeRef {
   x: number;
   y: number;
   facing: 'left' | 'right';
-  movementState: 'idle' | 'walk';
+  movementState: 'idle' | 'walk' | 'attack';
   name: string;
+  color: string;
   equippedWeaponId: string | null;
   speechBubble: { message: string; elapsed: number; duration: number } | null;
 }
@@ -28,6 +29,7 @@ export interface EngineContext {
   dealDamage?: (targetName: string, damage: number) => void;
   findCharacterPosition?: (name: string) => { x: number; y: number } | null;
   getWeaponDef?: (id: string) => { damage: number; rangeInCells: number } | null;
+  onAgentSay?: (name: string, color: string, message: string) => void;
 }
 
 export interface ActionDefinition<TParams = Record<string, unknown>> {
@@ -102,11 +104,12 @@ const sayAction: ActionDefinition<{ message: string }> = {
     },
     required: ['message'],
   },
-  traits: { targetType: 'none', baseDuration: 3, visualEffect: 'speech_bubble' },
-  run(agent, params) {
-    const duration = 3;
+  traits: { targetType: 'none', baseDuration: 8, visualEffect: 'speech_bubble' },
+  run(agent, params, ctx) {
+    const duration = 8;
     agent.speechBubble = { message: params.message, elapsed: 0, duration };
     agent.movementState = 'idle';
+    ctx.onAgentSay?.(agent.name, agent.color, params.message);
     let elapsed = 0;
     return {
       update(dt) { elapsed += dt; },
@@ -179,8 +182,10 @@ const attackAction: ActionDefinition<{ target: string }> = {
           agent.movementState = 'walk';
         } else if (!struck) {
           struck = true;
-          agent.movementState = 'idle';
+          agent.movementState = 'attack';
           ctx.dealDamage?.(params.target, weaponDef?.damage ?? 5);
+          // Hold attack pose briefly then finish.
+          setTimeout(() => { agent.movementState = 'idle'; }, 400);
           done = true;
         }
       },

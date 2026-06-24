@@ -13,7 +13,7 @@ export interface PersistedZone {
   spacingY?: number;
 }
 
-export type AnimationState = 'idle' | 'walk' | 'jump' | 'run';
+export type AnimationState = 'idle' | 'walk' | 'run' | 'jump' | 'attack';
 
 export type PersistedSprites = Partial<Record<AnimationState, PersistedZone>>;
 

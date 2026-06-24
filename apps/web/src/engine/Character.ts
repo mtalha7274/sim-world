@@ -11,6 +11,7 @@ export class Character {
   private currentState: AnimationState = 'idle';
 
   hasAnimations(): boolean { return this.animations.size > 0; }
+  availableStates(): AnimationState[] { return [...this.animations.keys()]; }
 
   setAnimation(state: AnimationState, anim: SpriteAnimation) {
     this.animations.set(state, anim);

@@ -38,20 +38,22 @@ export interface ZoneData {
 type ZonesMap = Partial<Record<AnimationState, ZoneData>>;
 
 interface Props {
-  worldRef:     RefObject<World | null>;
-  worldReady:   boolean;
-  selectedTile: number | null;
-  onTileSelect: (index: number | null) => void;
-  agents:       AgentStateSnapshot[];
+  worldRef:         RefObject<World | null>;
+  worldReady:       boolean;
+  selectedTile:     number | null;
+  onTileSelect:     (index: number | null) => void;
+  agents:           AgentStateSnapshot[];
+  onPresetsChange?: () => void;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const STATES: { value: AnimationState; label: string }[] = [
-  { value: 'idle', label: 'Idle' },
-  { value: 'walk', label: 'Walk' },
-  { value: 'jump', label: 'Jump' },
-  { value: 'run',  label: 'Run'  },
+  { value: 'idle',   label: 'Idle'   },
+  { value: 'walk',   label: 'Walk'   },
+  { value: 'run',    label: 'Run'    },
+  { value: 'jump',   label: 'Jump'   },
+  { value: 'attack', label: 'Attack' },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -206,7 +208,7 @@ function ZoneEditor({ initial, onSave, onRemove }: ZoneEditorProps) {
 
 type Tab = 'library' | 'assign' | 'ground';
 
-export function SpritePanel({ worldRef, worldReady, selectedTile, onTileSelect, agents }: Props) {
+export function SpritePanel({ worldRef, worldReady, selectedTile, onTileSelect, agents, onPresetsChange }: Props) {
   const [open,    setOpen]    = useState(true);
   const [tab,     setTab]     = useState<Tab>('library');
 
@@ -285,6 +287,7 @@ export function SpritePanel({ worldRef, worldReady, selectedTile, onTileSelect, 
     const updated = [...presets, preset];
     setPresets(updated);
     savePresets(updated);
+    onPresetsChange?.();
     setNewName('');
     setExpandedId(preset.id);
     setExpandedZones({});
@@ -295,6 +298,7 @@ export function SpritePanel({ worldRef, worldReady, selectedTile, onTileSelect, 
     const updated = presets.filter(p => p.id !== id);
     setPresets(updated);
     savePresets(updated);
+    onPresetsChange?.();
     if (expandedId === id) { setExpandedId(null); setExpandedZones({}); }
   };
 
@@ -303,6 +307,7 @@ export function SpritePanel({ worldRef, worldReady, selectedTile, onTileSelect, 
     const updated = presets.map(p => p.id !== presetId ? p : { ...p, zones: { ...p.zones, [state]: pz } });
     setPresets(updated);
     savePresets(updated);
+    onPresetsChange?.();
     setExpandedZones(prev => ({ ...prev, [state]: zone }));
   };
 

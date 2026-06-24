@@ -1,7 +1,7 @@
 import type { Input } from './Input';
 
 export type MovementState = 'idle' | 'walk' | 'run';
-export type AnimationState = MovementState | 'jump';
+export type AnimationState = MovementState | 'jump' | 'attack';
 export type Facing = 'left' | 'right';
 
 const WALK_SPEED = 160;

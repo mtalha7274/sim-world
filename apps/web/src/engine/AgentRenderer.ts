@@ -106,7 +106,10 @@ export class AgentRenderer {
     const halfH = hasSprite ? RENDER_HEIGHT / 2 : PH_H / 2;
 
     if (hasSprite) {
-      const animState = agent.movementState === 'walk' ? 'walk' as const : 'idle' as const;
+      const avail = agent.character.availableStates();
+      const animState = avail.includes(agent.movementState as never)
+        ? agent.movementState as import('./Player').AnimationState
+        : 'idle';
       agent.character.draw(ctx, sx, sy, animState, agent.facing);
     } else {
       this.drawPlaceholder(ctx, sx, sy, agent.color);

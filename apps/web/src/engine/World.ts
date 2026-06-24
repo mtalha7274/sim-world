@@ -98,11 +98,16 @@ export class World {
     getWeaponDef: (id) => {
       return this.weaponDefs.find(w => w.id === id) ?? null;
     },
+    onAgentSay: (name, color, message) => {
+      this.onChatMessage?.(name, color, false, message);
+    },
   };
 
   // React callbacks.
-  onAgentsChange?:     (agents: AgentStateSnapshot[]) => void;
+  onAgentsChange?:      (agents: AgentStateSnapshot[]) => void;
   onPlayerStateChange?: (state: PlayerState) => void;
+  onChatMessage?:       (from: string, color: string, isPlayer: boolean, text: string) => void;
+  onAgentError?:        (name: string, color: string, message: string) => void;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -121,6 +126,9 @@ export class World {
 
     this.agentManager.onStateChange = () => {
       this.onAgentsChange?.(this.agentManager.getStateSnapshots());
+    };
+    this.agentManager.onAgentError = (name, color, msg) => {
+      this.onAgentError?.(name, color, msg);
     };
 
     this.input.attach();
@@ -141,6 +149,10 @@ export class World {
 
   setApiKey(key: string) {
     this.agentManager.setApiKey(key);
+  }
+
+  setArenaRules(rules: string) {
+    this.agentManager.setArenaRules(rules);
   }
 
   setPauseAI(paused: boolean) {
@@ -219,6 +231,7 @@ export class World {
 
   broadcastPlayerMessage(text: string, targetId?: string) {
     this.playerSpeech = { message: text, elapsed: 0, duration: 5000 };
+    this.onChatMessage?.('You', '#6366f1', true, text);
     const RADIUS = 8 * CELL_SIZE;
     const agents = this.agentManager.getAgents();
 
@@ -325,7 +338,12 @@ export class World {
 
     this.camera.update(dt, this.player.x, this.player.y);
     this.character.update(dt, this.player.animationState);
-    this.agentManager.update(dt, this.player, this.engineCtx);
+    const playerCtx: import('./WorldSnapshot').PlayerContext = {
+      x: this.player.x,
+      y: this.player.y,
+      health: { currentHP: this.playerHealth.currentHP, maxHP: this.playerHealth.maxHP },
+    };
+    this.agentManager.update(dt, this.player, this.engineCtx, playerCtx);
 
     if (this.playerSpeech) {
       this.playerSpeech.elapsed += dt * 1000;

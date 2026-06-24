@@ -11,7 +11,9 @@ export interface AgentStateSnapshot {
   lifecycleState: 'idle' | 'thinking' | 'acting';
   actionName: string | null;
   memory: string[];
+  experience: string[];
   lastDecision: AgentDecisionResponse | null;
+  lastErrorMsg: string | null;
   health: { maxHP: number; currentHP: number; isDead: boolean };
   equippedWeaponId: string | null;
   model: string;
@@ -26,6 +28,7 @@ export class AgentManager {
   private dirty   = false;
 
   onStateChange?: () => void;
+  onAgentError?:  (name: string, color: string, message: string) => void;
 
   setApiKey(key: string) {
     this.apiKey = key;
@@ -46,6 +49,10 @@ export class AgentManager {
 
   spawn(opts: AgentOptions): string {
     const agent = new AgentRuntime(opts);
+    agent.onError = (msg) => {
+      this.onAgentError?.(agent.name, agent.color, msg);
+      this.dirty = true;
+    };
     this.agents.push(agent);
     this.dirty = true;
     return agent.id;
@@ -59,10 +66,13 @@ export class AgentManager {
     }
   }
 
-  update(dt: number, player: Player, ctx: EngineContext) {
+  private arenaRules = '';
+  setArenaRules(rules: string) { this.arenaRules = rules; }
+
+  update(dt: number, player: Player, ctx: EngineContext, playerCtx?: import('./WorldSnapshot').PlayerContext) {
     for (const agent of this.agents) {
       const provider = this.providerFor(agent.model);
-      const changed  = agent.update(dt, provider, player.x, player.y, this.agents, this.pauseAI, ctx);
+      const changed  = agent.update(dt, provider, player.x, player.y, this.agents, this.pauseAI, ctx, this.arenaRules, playerCtx);
       if (changed) this.dirty = true;
     }
 
@@ -97,7 +107,9 @@ export class AgentManager {
       lifecycleState:  a.lifecycleState,
       actionName:      a.getActionName(),
       memory:          [...a.memory],
+      experience:      [...a.experience],
       lastDecision:    a.lastDecision,
+      lastErrorMsg:    a.lastErrorMsg,
       health:          { maxHP: a.health.maxHP, currentHP: a.health.currentHP, isDead: a.health.isDead },
       equippedWeaponId: a.equippedWeaponId,
       model:           a.model,

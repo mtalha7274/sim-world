@@ -2,51 +2,42 @@ import { useState, useCallback } from 'react';
 import { loadSettings, saveSettings } from '../store/settings';
 
 interface Props {
-  onApiKeyChange: (apiKey: string) => void;
+  onSettingsChange: (apiKey: string, model: string) => void;
 }
 
-export function SettingsPanel({ onApiKeyChange }: Props) {
+export function SettingsPanel({ onSettingsChange }: Props) {
   const [open,   setOpen]   = useState(false);
-  const [apiKey, setApiKey] = useState(() => loadSettings().openrouterApiKey);
+  const initial = loadSettings();
+  const [apiKey, setApiKey] = useState(initial.openrouterApiKey);
+  const [model,  setModel]  = useState(initial.openrouterModel);
   const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
   const [testError,  setTestError]  = useState('');
 
   const handleSave = useCallback(() => {
-    saveSettings({ openrouterApiKey: apiKey, openrouterModel: '' });
-    onApiKeyChange(apiKey);
+    saveSettings({ openrouterApiKey: apiKey, openrouterModel: model });
+    onSettingsChange(apiKey, model);
     setOpen(false);
-  }, [apiKey, onApiKeyChange]);
+  }, [apiKey, model, onSettingsChange]);
 
   const handleTest = useCallback(async () => {
-    if (!apiKey) {
-      setTestStatus('error');
-      setTestError('Enter an API key first.');
-      return;
-    }
-    setTestStatus('loading');
-    setTestError('');
+    if (!apiKey) { setTestStatus('error'); setTestError('Enter an API key first.'); return; }
+    setTestStatus('loading'); setTestError('');
     try {
       const { testConnection } = await import('../llm/OpenRouterProvider');
-      await testConnection(apiKey, 'openai/gpt-4o-mini');
+      await testConnection(apiKey, model || 'openai/gpt-4o-mini');
       setTestStatus('ok');
     } catch (e) {
       setTestStatus('error');
       setTestError(e instanceof Error ? e.message : String(e));
     }
-  }, [apiKey]);
+  }, [apiKey, model]);
 
   return (
     <>
       <button
         onClick={() => setOpen(v => !v)}
         title="Settings"
-        className="
-          fixed top-3 left-3 z-50
-          w-8 h-8 bg-white border border-gray-200 rounded-md
-          flex items-center justify-center
-          text-gray-400 hover:text-gray-600 hover:border-gray-300
-          shadow-sm transition-all
-        "
+        className="fixed top-3 left-3 z-50 w-8 h-8 bg-white border border-gray-200 rounded-md flex items-center justify-center text-gray-400 hover:text-gray-600 hover:border-gray-300 shadow-sm transition-all"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="12" cy="12" r="3"/>
@@ -55,39 +46,28 @@ export function SettingsPanel({ onApiKeyChange }: Props) {
       </button>
 
       {open && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center"
-          style={{ background: 'rgba(0,0,0,0.25)' }}
-          onClick={e => { if (e.target === e.currentTarget) setOpen(false); }}
-        >
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.25)' }} onClick={e => { if (e.target === e.currentTarget) setOpen(false); }}>
           <div className="bg-white rounded-xl shadow-xl border border-gray-200 w-[360px] flex flex-col overflow-hidden">
 
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <span className="text-sm font-semibold text-gray-700">Settings</span>
-              <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors text-lg leading-none">×</button>
+              <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
             </div>
 
             <div className="px-5 py-4 flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-gray-600">OpenRouter API key</label>
-                <input
-                  type="password"
-                  value={apiKey}
-                  onChange={e => { setApiKey(e.target.value); setTestStatus('idle'); }}
-                  placeholder="sk-or-…"
-                  className="px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-gray-400 bg-white"
-                />
-                <p className="text-[10px] text-gray-400">
-                  Each agent picks its own model at spawn time.
-                </p>
+                <input type="password" value={apiKey} onChange={e => { setApiKey(e.target.value); setTestStatus('idle'); }} placeholder="sk-or-…" className="px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-gray-400 bg-white" />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <button
-                  onClick={handleTest}
-                  disabled={testStatus === 'loading'}
-                  className="py-1.5 text-xs border border-gray-200 rounded-md text-gray-500 hover:border-gray-300 hover:text-gray-700 transition-colors disabled:opacity-50"
-                >
+                <label className="text-xs font-medium text-gray-600">Default model</label>
+                <input type="text" value={model} onChange={e => { setModel(e.target.value); setTestStatus('idle'); }} placeholder="e.g. google/gemini-flash-1.5" className="px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-gray-400 bg-white" />
+                <p className="text-[10px] text-gray-400">Pre-fills the model field when spawning agents. Each agent can override.</p>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <button onClick={handleTest} disabled={testStatus === 'loading'} className="py-1.5 text-xs border border-gray-200 rounded-md text-gray-500 hover:border-gray-300 hover:text-gray-700 transition-colors disabled:opacity-50">
                   {testStatus === 'loading' ? 'Testing…' : 'Test connection'}
                 </button>
                 {testStatus === 'ok'    && <p className="text-[11px] text-green-600 text-center">Connection successful</p>}
@@ -95,7 +75,7 @@ export function SettingsPanel({ onApiKeyChange }: Props) {
               </div>
 
               <p className="text-[10px] text-gray-400 leading-relaxed bg-gray-50 rounded-md px-3 py-2">
-                The API key is stored only in this browser's local storage and sent directly to OpenRouter. Do not deploy this app publicly with a key embedded.
+                API key stored only in this browser's local storage. Do not deploy publicly with a key embedded.
               </p>
             </div>
 

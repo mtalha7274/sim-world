@@ -45,27 +45,14 @@ export function AccessoriesPanel({ worldRef, playerState, onWeaponsChange }: Pro
 
   return (
     <>
-      {/* Shield/sword button */}
+      {/* HP & Weapons button */}
       <button
         onClick={() => setOpen(v => !v)}
-        title="Accessories"
-        className="
-          fixed top-3 left-12 z-50
-          w-8 h-8 bg-white border border-gray-200 rounded-md
-          flex items-center justify-center
-          text-gray-400 hover:text-gray-600 hover:border-gray-300
-          shadow-sm transition-all
-        "
+        title="Player HP & Weapons"
+        className="fixed top-3 left-12 z-50 flex items-center gap-1.5 px-2 h-8 bg-white border border-gray-200 rounded-md text-gray-500 hover:text-gray-700 hover:border-gray-300 shadow-sm transition-all text-[11px] font-medium"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M14.5 10c-.83 0-1.5-.67-1.5-1.5v-5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5z"/>
-          <path d="M20.5 10H19V8.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
-          <path d="M9.5 14c.83 0 1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5S8 21.33 8 20.5v-5c0-.83.67-1.5 1.5-1.5z"/>
-          <path d="M3.5 14H5v1.5c0 .83-.67 1.5-1.5 1.5S2 16.33 2 15.5 2.67 14 3.5 14z"/>
-          <path d="M14 14l-4 4"/>
-          <path d="M14 14l2-2"/>
-          <path d="M10 10l2-2"/>
-        </svg>
+        <span className={`w-2 h-2 rounded-full shrink-0 ${playerState.currentHP / playerState.maxHP > 0.5 ? 'bg-green-400' : playerState.currentHP / playerState.maxHP > 0.25 ? 'bg-orange-400' : 'bg-red-400'}`} />
+        HP & Items
       </button>
 
       {/* Modal */}

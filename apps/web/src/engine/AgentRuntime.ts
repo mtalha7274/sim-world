@@ -21,8 +21,10 @@ export interface AgentOptions {
 
 let nextId = 1;
 
-const IDLE_COOLDOWN = 1.5;
-const MAX_MEMORY    = 15;
+const IDLE_COOLDOWN    = 1.5;
+const MAX_MEMORY       = 10;   // recent working memory entries
+const COMPRESS_BATCH   = 5;    // entries to compress when overflow
+const MAX_EXPERIENCE   = 8;    // experience chunk slots
 
 export class AgentRuntime {
   readonly id: string;
@@ -38,7 +40,7 @@ export class AgentRuntime {
   x: number;
   y: number;
   facing: 'left' | 'right' = 'right';
-  movementState: 'idle' | 'walk' = 'idle';
+  movementState: 'idle' | 'walk' | 'attack' = 'idle';
 
   health: Health;
 
@@ -49,9 +51,17 @@ export class AgentRuntime {
 
   lifecycleState: AgentLifecycleState = 'idle';
   memory: string[];
+  experience: string[] = [];   // compressed episode summaries, oldest→newest
   lastDecision: AgentDecisionResponse | null = null;
 
+  /** Last LLM error message — read by AgentManager to surface in debug panel. */
+  lastErrorMsg: string | null = null;
+  /** Called by AgentManager; fires when a new error occurs. */
+  onError?: (message: string) => void;
+
   private idleElapsed = 0;
+  private backoffMs   = 0;   // exponential backoff delay after errors
+  private retryAt     = 0;   // Date.now() timestamp: don't retry before this
 
   private decisionReady  = false;
   private decisionResult: AgentDecisionResponse | null = null;
@@ -86,11 +96,16 @@ export class AgentRuntime {
     allAgents: AgentRuntime[],
     isPaused: boolean,
     ctx: EngineContext,
+    arenaRules: string,
+    playerCtx: import('./WorldSnapshot').PlayerContext | undefined,
   ): boolean {
     if (this.health.isDead) return false;
 
     // Advance character animation in the update phase.
-    this.character.update(dt, this.movementState === 'walk' ? 'walk' : 'idle');
+    const animState = this.character.availableStates().includes(this.movementState as never)
+      ? this.movementState as import('./Player').AnimationState
+      : 'idle';
+    this.character.update(dt, animState);
 
     // Tick speech bubble.
     if (this.speechBubble) {
@@ -105,8 +120,8 @@ export class AgentRuntime {
     switch (this.lifecycleState) {
       case 'idle': {
         this.idleElapsed += dt;
-        if (this.idleElapsed >= IDLE_COOLDOWN && provider && !isPaused) {
-          this.startThinking(provider, playerX, playerY, allAgents);
+        if (this.idleElapsed >= IDLE_COOLDOWN && provider && !isPaused && Date.now() >= this.retryAt) {
+          this.startThinking(provider, playerX, playerY, allAgents, arenaRules, playerCtx);
         }
         break;
       }
@@ -146,6 +161,11 @@ export class AgentRuntime {
     return this.currentActionDef?.name ?? null;
   }
 
+  /** Animation states this agent currently has sprites for. */
+  get availableAnimations(): string[] {
+    return this.character.availableStates();
+  }
+
   /** Append a player message to this agent's memory (for next decision cycle). */
   queueMessage(text: string) {
     this.appendMemory(`Player said: "${text}"`);
@@ -160,6 +180,8 @@ export class AgentRuntime {
     playerX: number,
     playerY: number,
     allAgents: AgentRuntime[],
+    arenaRules: string,
+    playerCtx: import('./WorldSnapshot').PlayerContext | undefined,
   ) {
     this.lifecycleState = 'thinking';
     this.decisionReady  = false;
@@ -167,16 +189,35 @@ export class AgentRuntime {
     this.decisionError  = false;
 
     const allowed = this.allowedActions ?? actionRegistry.map(a => a.name);
-    const request = generateSnapshot(this, playerX, playerY, allAgents, allowed);
+
+    // Detect crowding: other agents within 1 cell of this agent.
+    const myCellX = Math.floor(this.x / CELL_SIZE);
+    const myCellY = Math.floor(this.y / CELL_SIZE);
+    const crowdedBy = allAgents
+      .filter(a => a.id !== this.id)
+      .filter(a => Math.abs(Math.floor(a.x / CELL_SIZE) - myCellX) <= 1 && Math.abs(Math.floor(a.y / CELL_SIZE) - myCellY) <= 1)
+      .map(a => a.name);
+
+    const request = generateSnapshot(this, playerX, playerY, allAgents, allowed, playerCtx, arenaRules, crowdedBy);
 
     provider.decide(request)
       .then(result => {
-        this.lastDecision  = result;
+        this.lastDecision   = result;
         this.decisionResult = result;
         this.decisionReady  = true;
+        // Reset backoff on success.
+        this.backoffMs  = 0;
+        this.retryAt    = 0;
+        this.lastErrorMsg = null;
       })
       .catch(err => {
+        const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
         console.warn(`[Agent:${this.name}] decision failed:`, err);
+        this.lastErrorMsg = msg;
+        this.onError?.(msg);
+        // Exponential backoff: 8s → 16s → 32s → 60s max.
+        this.backoffMs = this.backoffMs === 0 ? 8_000 : Math.min(this.backoffMs * 2, 60_000);
+        this.retryAt   = Date.now() + this.backoffMs;
         this.decisionError = true;
       });
   }
@@ -207,8 +248,12 @@ export class AgentRuntime {
   private appendMemory(line: string) {
     this.memory.push(line);
     if (this.memory.length > MAX_MEMORY) {
-      const overflow = this.memory.splice(0, this.memory.length - MAX_MEMORY);
-      this.memory.unshift(`[Earlier: ${overflow.join('; ')}]`);
+      // Compress oldest COMPRESS_BATCH entries into one experience chunk.
+      const batch = this.memory.splice(0, COMPRESS_BATCH);
+      const chunk  = `[Ep.${this.experience.length + 1}] ${batch.join(' → ')}`;
+      this.experience.push(chunk);
+      // Keep experience bounded — drop oldest chunk.
+      if (this.experience.length > MAX_EXPERIENCE) this.experience.shift();
     }
   }
 }
